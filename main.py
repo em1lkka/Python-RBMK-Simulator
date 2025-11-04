@@ -3,7 +3,7 @@ import sys
 
 pygame.init()
 
-WIDTH, HEIGHT = 600, 400
+WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("RBMK Simulator")
 clock = pygame.time.Clock()
@@ -12,6 +12,9 @@ clock = pygame.time.Clock()
 power = 0.8
 temperature = 0.3
 coolant_pump = 0.5
+xenon = 0.0
+reactivity = 0.0
+
 
 #rods
 rods = [0.0 for _ in range(9)]
@@ -27,7 +30,7 @@ def draw_bar(x, value, color, label):
     else:
         text = font.render(f"{label}: {value*100:.0f}%", True, (200, 200, 200))
 
-    screen.blit(text, (x - 10, HEIGHT - 40))
+    screen.blit(text, (x - 15, HEIGHT - 30))
 
 while True:
     for event in pygame.event.get():
@@ -65,17 +68,29 @@ while True:
     temperature -= coolant_pump * 0.005
     temperature = max(0.0, min(temperature, 1.0))
 
-    #Power control
+    # Control rods and coolant affect reactivity
     rod_effect = sum(rods) / len(rods)
-    power += (0.99 - rod_effect - power) * 0.02
-    power = max(0.0, min(power, 1.0))
+    void_fraction = 1.0 - coolant_pump  # less coolant -> more voids
+    reactivity = 0.5 - rod_effect * 0.5 + void_fraction * 0.4  # RBMK quirk!
+
+    # Apply xenon poisoning (reduces reactivity)
+    reactivity -= xenon * 0.6
+
+    # Power moves toward reactivity gradually
+    power += (reactivity - power) * 0.01
+    power = max(0.0, min(power, 1.5))  # allow some overshoot
+
+    # Xenon buildup: more at high power, decays at low power
+    xenon += power * 0.0003 - xenon * 0.001
+    xenon = max(0.0, min(xenon, 1.0))
 
     # 3. Draw everything
     screen.fill((30, 30, 30))
 
-    draw_bar(150, power, (255, 150, 0), "Power")
-    draw_bar(300, temperature, (255, 0, 0), "Temp")
-    draw_bar(450, coolant_pump, (0, 150, 255), "Coolant")
+    draw_bar(100, power, (255, 150, 0), "Power")
+    draw_bar(250, temperature, (255, 0, 0), "Temp")
+    draw_bar(400, coolant_pump, (0, 150, 255), "Coolant")
+    draw_bar(550, xenon, (150, 0, 200), "Xenon")
 
     rod_width = 40
     rod_height_max = 100
